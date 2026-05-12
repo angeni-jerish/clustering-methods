@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import sklearn
-import pandas as pd
 from sklearn.datasets import load_iris
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
@@ -15,7 +14,10 @@ X_scaled = StandardScaler().fit_transform(X)
 k_val=len(np.unique(iris.target)) 
 kmeans = KMeans(n_clusters=k_val, random_state=30).fit(X_scaled)
 # Agglomerative Clustering
-agglo = AgglomerativeClustering(n_clusters=k_val).fit(X_scaled)
+agglo = AgglomerativeClustering(distance_threshold=10, n_clusters=None).fit(X_scaled)
+
+# agglo clusters found:
+print(f"Number of clusters found: {agglo.n_clusters_}")
 # DBSCAN Clustering
 dbscan = DBSCAN(eps=0.5, min_samples=5).fit(X_scaled)
 
