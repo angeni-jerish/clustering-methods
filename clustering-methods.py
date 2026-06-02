@@ -71,7 +71,7 @@ k_distances = np.sort(distances[:, min_samples_val - 1])
 
 # find the "Elbow/Knee" point on this curve
 k_choices = range(len(k_distances))
-kl_dbscan = KneeLocator(k_choices, k_distances, curve='concave', direction='increasing')
+kl_dbscan = KneeLocator(k_choices, k_distances, curve='convex', direction='increasing')
 
 auto_eps = k_distances[kl_dbscan.knee]
 print(f"The optimal epsilon(radius) value is (By K-Nearest Neighbours, DBSAN Clustering): {auto_eps:.3f}")
