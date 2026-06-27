@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import sklearn
-from sklearn.datasets import load_iris
+from sklearn.datasets import load_iris, make_moons
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
@@ -8,6 +8,10 @@ from kneed import KneeLocator
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+
+#fixing issue with DBCV
+if not hasattr(np, 'float_'):
+    np.float_ = np.float64
 
 # Load the Iris dataset
 iris = load_iris() 
@@ -19,6 +23,10 @@ X_scaled = StandardScaler().fit_transform(X)
 #PCA (making 2 dimensions)
 pca = PCA(n_components=2)
 X_pca = pca.fit_transform(X_scaled)
+
+# MOONS DATASET FOR DBSCAN
+X_moons, y_moons = make_moons(n_samples=300, noise=0.15, random_state=42)
+moon_names = ['Bottom Crescent', 'Top Crescent']
 
 ''' 
 #KEEP CODE IN CASE
