@@ -1,46 +1,56 @@
 from clustering_methods import *
 
-best_k = 2
-best_score = -1
-best_dbi_k = 2
-best_dbi_score = float('inf')  # Start at infinity because lower is better
-best_ch_k = 2
-best_ch_score = -1             # Start at -1 because higher is better
+# 1. Define your range of distance thresholds to test
+# Adjust the start, stop, and num steps based on your PCA data variance
+thresholds = np.linspace(1.0, 15.0, num=30)
 
-for k in range(2, 11):
-    #Silhouette Score
-    # Temporarily fit a model with k clusters
-    temp_model = AgglomerativeClustering(n_clusters=k).fit(X_pca)
+best_thresh = thresholds[0]
+best_score = -1
+best_dbi_thresh = thresholds[0]
+best_dbi_score = float('inf')  # Lower is better
+best_ch_thresh = thresholds[0]
+best_ch_score = -1             # Higher is better
+
+for t in thresholds:
+    # Set n_clusters=None to use distance_threshold
+    temp_model = AgglomerativeClustering(n_clusters=None, distance_threshold=t).fit(X_pca)
     labels = temp_model.labels_
-    # Calculate the silhouette score for this configuration
+    
+    # Validation: Metrics require between 2 and (N-1) clusters to calculate properly
+    num_clusters = len(np.unique(labels))
+    if num_clusters < 2 or num_clusters >= len(X_pca):
+        print(f"Testing threshold={t:.2f} -> Skipped (Created {num_clusters} clusters)")
+        continue
+
+    # Silhouette Score
     sil_score = silhouette_score(X_pca, labels)
-    print(f"Testing k={k} -> Silhouette Score: {sil_score:.3f}")
-    # Track the highest score
+    print(f"Testing threshold={t:.2f} ({num_clusters} clusters) -> Silhouette Score: {sil_score:.3f}")
     if sil_score > best_score:
         best_score = sil_score
-        best_k = k
+        best_thresh = t
 
-    #DBI
+    # DBI
     dbi_score = davies_bouldin_score(X_pca, labels)
-    print(f"Testing k={k} -> Davies-Bouldin Index: {dbi_score:.3f}")
-    if dbi_score < best_dbi_score:  # Lower is better!
-        best_dbi_score, best_dbi_k = dbi_score, k
+    print(f"Testing threshold={t:.2f} ({num_clusters} clusters) -> Davies-Bouldin Index: {dbi_score:.3f}")
+    if dbi_score < best_dbi_score:
+        best_dbi_score = dbi_score
+        best_dbi_thresh = t
 
-    #CH
+    # CH
     ch_score = calinski_harabasz_score(X_pca, labels)
-    print(f"Testing k={k} -> Calinski-Harabasz Index: {ch_score:.3f}")
-    if ch_score > best_ch_score:  # Higher is better!
-        best_ch_score, best_ch_k = ch_score, k
+    print(f"Testing threshold={t:.2f} ({num_clusters} clusters) -> Calinski-Harabasz Index: {ch_score:.3f}")
+    if ch_score > best_ch_score:
+        best_ch_score = ch_score
+        best_ch_thresh = t
 
-print(f"\nThe optimal num of clusters (By Silhouette Coefficient testing): {best_k}")
-print(f"The optimal num of clusters (By Davies-Bouldin Index testing): {best_dbi_k}")
-print(f"The optimal num of clusters (By Calinski-Harabasz Index testing): {best_ch_k}")
+print(f"\nThe optimal threshold (By Silhouette Coefficient testing): {best_thresh:.2f}")
+print(f"The optimal threshold (By Davies-Bouldin Index testing): {best_dbi_thresh:.2f}")
+print(f"The optimal threshold (By Calinski-Harabasz Index testing): {best_ch_thresh:.2f}")
 
-# Agglomerative Clustering
-agglo_S = AgglomerativeClustering(n_clusters=best_k).fit(X_pca)
-agglo_D = AgglomerativeClustering(n_clusters=best_dbi_k).fit(X_pca)
-agglo_C = AgglomerativeClustering(n_clusters=best_ch_k).fit(X_pca)
-
+# Refit the models using the discovered optimal thresholds
+agglo_S = AgglomerativeClustering(n_clusters=None, distance_threshold=best_thresh).fit(X_pca)
+agglo_D = AgglomerativeClustering(n_clusters=None, distance_threshold=best_dbi_thresh).fit(X_pca)
+agglo_C = AgglomerativeClustering(n_clusters=None, distance_threshold=best_ch_thresh).fit(X_pca)
 
 models = [agglo_S.labels_, agglo_D.labels_, agglo_C.labels_]
 names = ['Silhouette', 'Davies-Bouldin', 'Calinski-Harabasz']
@@ -70,7 +80,6 @@ for i, (model, name) in enumerate(zip(models, names)):
         species_breakdown = " + ".join(breakdown_parts)
         legend_labels.append(f"C{cluster_id} ({total_pts} pts: {species_breakdown})")
     
-    # Place a clean legend below each individual subplot
     ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper center', bbox_to_anchor=(0.5, -0.15), fontsize=8)
 
 plt.tight_layout()
