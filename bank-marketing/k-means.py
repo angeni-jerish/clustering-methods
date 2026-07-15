@@ -158,3 +158,23 @@ for name, model in zip(names, models):
 # Clean up dataframe column modification
 df.drop(columns=['Temp_Cluster'], errors='ignore')
 print("\nExecution complete.")
+
+# 2. Print out a detailed breakdown of each of the 7 clusters
+print("\n=== DETAILED ANALYSIS OF THE 7 CLUSTERS ===")
+df['Final_Cluster'] = kmeans_D.labels_
+for cluster_num in range(7):
+    cluster_data = df[df['Final_Cluster'] == cluster_num]
+    # Calculate group size and subscription rate
+    total_in_group = len(cluster_data)
+    sub_rate = (cluster_data['Class'] == 2).mean() * 100
+    
+    # Calculate the average call duration (V12) and average balance (V6) for context
+    avg_age = cluster_data['V1'].mean()
+    avg_balance = cluster_data['V6'].mean()
+    avg_day_contacted = cluster_data['V10'].mean()
+    avg_call_duration = cluster_data['V12'].mean()
+    avg_campaign_contacts = cluster_data['V13'].mean()
+    avg_days_passed = cluster_data['V14'].mean()
+    avg_previous_contacts = cluster_data['V15'].mean()
+    
+    print(f"Cluster {cluster_num}: Size = {total_in_group:<5} | Sub Rate = {sub_rate:.1f}% | Avg Age = {avg_age:.1f} | Avg Balance = €{avg_balance:,.0f} | Avg Day Contacted = {avg_day_contacted:.1f} | Avg Call Duration = {avg_call_duration:.0f}s | Avg Campaign Contacts = {avg_campaign_contacts:.1f} | Avg Days Passed = {avg_days_passed:.1f} | Avg Previous Contacts = {avg_previous_contacts:.1f}")
