@@ -23,24 +23,52 @@ X = df.drop(columns=['Class'])
 y = df['Class']
 
 X_scaled = StandardScaler().fit_transform(X)
-
 # ELBOW METHOD
 inertia_scores = []
-k_choices = range(2, 8) #there can be a maximum of 7 clusters in this dataset, as there are only 7 unique classes
+k_choices = range(2, 30) 
+
+#Sillhouette Score, Davies-Bouldin Index, Calinski-Harabasz Index Loop
+best_k = 2
+best_score = -1
+best_dbi_k = 2
+best_dbi_score = float('inf')  
+best_ch_k = 2
+best_ch_score = -1
+
 for k in k_choices:
-    km = KMeans(n_clusters=k).fit(X_scaled)
+    #Elbow Method
+    km = KMeans(n_clusters=k, n_init=50, random_state=42).fit(X_scaled)
     inertia_scores.append(km.inertia_)
+
+    #Silhouette Score
+    labels = km.labels_
+    sil_score = silhouette_score(X_scaled, labels)
+    print(f"Testing k={k} -> Silhouette Score: {sil_score:.3f}")
+    if sil_score > best_score:
+        best_score = sil_score
+        best_k = k
+
+    #DBI
+    dbi_score = davies_bouldin_score(X_scaled, labels)
+    print(f"Testing k={k} -> Davies-Bouldin Index: {dbi_score:.3f}")
+    if dbi_score < best_dbi_score: 
+        best_dbi_score, best_dbi_k = dbi_score, k
+
+    #CH
+    ch_score = calinski_harabasz_score(X_scaled, labels)
+    print(f"Testing k={k} -> Calinski-Harabasz Index: {ch_score:.3f}")
+    if ch_score > best_ch_score: 
+        best_ch_score, best_ch_k = ch_score, k
+
 kl = KneeLocator(k_choices, inertia_scores, curve='convex', direction='decreasing')
 auto_k_val = kl.elbow
-
-
 
 #Gap Statistic
 gap_scores = []
 se_scores = []  # Array to store standard errors for each k
 B = 100  # Number of random datasets to generate per k
-X_min = X.min(axis=0)
-X_max = X.max(axis=0)
+X_min = X_scaled.min(axis=0)
+X_max = X_scaled.max(axis=0)
 
 for idx, k in enumerate(k_choices):
     real_inertia = inertia_scores[idx]
@@ -76,36 +104,6 @@ for i in range(len(k_choices) - 1):
     if gap_curr >= gap_next - se_next:
         gap_k_val = k_curr
         break
-
-#Sillhouette Score, Davies-Bouldin Index, Calinski-Harabasz Index Loop
-best_k = 2
-best_score = -1
-best_dbi_k = 2
-best_dbi_score = float('inf')  
-best_ch_k = 2
-best_ch_score = -1
-
-for k in range(2, 8):
-    #Silhouette Score
-    temp_model = KMeans(n_clusters=k, n_init=50, random_state=42).fit(X_scaled)
-    labels = temp_model.labels_
-    sil_score = silhouette_score(X_scaled, labels)
-    print(f"Testing k={k} -> Silhouette Score: {sil_score:.3f}")
-    if sil_score > best_score:
-        best_score = sil_score
-        best_k = k
-
-    #DBI
-    dbi_score = davies_bouldin_score(X_scaled, labels)
-    print(f"Testing k={k} -> Davies-Bouldin Index: {dbi_score:.3f}")
-    if dbi_score < best_dbi_score: 
-        best_dbi_score, best_dbi_k = dbi_score, k
-
-    #CH
-    ch_score = calinski_harabasz_score(X_scaled, labels)
-    print(f"Testing k={k} -> Calinski-Harabasz Index: {ch_score:.3f}")
-    if ch_score > best_ch_score: 
-        best_ch_score, best_ch_k = ch_score, k
 
 print(f"The optimal num of clusters (By Elbow method): {auto_k_val}")
 print(f"The optimal num of clusters (By Gap Statistic method): {gap_k_val}")
@@ -156,19 +154,18 @@ for name, model in zip(names, models):
     print(f"{name:<20} | {model.n_clusters:<8} | {contrast:.2f}% ({min_rate:.1f}% to {max_rate:.1f}%)")
 
 # Clean up dataframe column modification
-df.drop(columns=['Temp_Cluster'], errors='ignore')
+df.drop(columns=['Temp_Cluster'], errors='ignore', inplace=True)
 print("\nExecution complete.")
 
 # 2. Print out a detailed breakdown of each of the 7 clusters
 print("\n=== DETAILED ANALYSIS OF THE 7 CLUSTERS ===")
 df['Final_Cluster'] = kmeans_D.labels_
-for cluster_num in range(7):
+for cluster_num in range(kmeans_D.n_clusters):
     cluster_data = df[df['Final_Cluster'] == cluster_num]
     # Calculate group size and subscription rate
     total_in_group = len(cluster_data)
     sub_rate = (cluster_data['Class'] == 2).mean() * 100
     
-    # Calculate the average call duration (V12) and average balance (V6) for context
     avg_age = cluster_data['V1'].mean()
     avg_balance = cluster_data['V6'].mean()
     avg_day_contacted = cluster_data['V10'].mean()
