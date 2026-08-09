@@ -10,6 +10,7 @@ from kneed import KneeLocator
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import adjusted_rand_score
 
 #fixing issue with DBCV
 if not hasattr(np, 'float_'):

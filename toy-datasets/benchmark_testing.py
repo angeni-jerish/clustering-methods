@@ -8,7 +8,11 @@ class BenchmarkDataset:
         self.n_samples = n_samples
         self.random_state = random_state
         self.X, self.y = self.choose_scenario()
+        self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state).fit(self.X)
 
+    def get_target(self):
+        return self.target
+    
     #Expecting 3 clusters, 10 features, 1000 samples
     def choose_scenario(self):
         if self.scenario == "baseline":
@@ -99,7 +103,7 @@ class BenchmarkDataset:
         X_scaled = StandardScaler().fit_transform(X)
         return X_scaled, y
 
-    def generate_benchmark_datasets(self):
+    def km_methods(self):
         inertia_scores = []
         k_choices = range(1, 11)
         for k in k_choices:
@@ -167,7 +171,6 @@ class BenchmarkDataset:
             if sil_score > best_score:
                 best_score = sil_score
                 best_k = k
-
             # DBI
             dbi_score = davies_bouldin_score(self.X, labels)
             print(f"Testing k={k} -> Davies-Bouldin Index: {dbi_score:.3f}")
@@ -186,7 +189,7 @@ class BenchmarkDataset:
         print(f"The optimal num of clusters (By Davies-Bouldin Index testing): {best_dbi_k}")
         print(f"The optimal num of clusters (By Calinski-Harabasz Index testing): {best_ch_k}")
 
-        # K-Means Clustering Models
+
         # K-Means Clustering Models (Dynamically packed)
         models = []
         names = []
@@ -194,23 +197,34 @@ class BenchmarkDataset:
             kmeans_E = KMeans(n_clusters=auto_k_val, n_init=50, random_state=42).fit(self.X)
             models.append(kmeans_E)
             names.append('Elbow Method')
+            ari_E = adjusted_rand_score(self.target.labels_, kmeans_E.labels_)
+            print(f"Adjusted Rand Index (ARI) for Elbow Method: {ari_E:.4f}")
         if best_k is not None:
             kmeans_S = KMeans(n_clusters=best_k, n_init=50, random_state=42).fit(self.X)
             models.append(kmeans_S)
             names.append('Silhouette Coefficient')
+            ari_S = adjusted_rand_score(self.target.labels_, kmeans_S.labels_)
+            print(f"Adjusted Rand Index (ARI) for Silhouette Coefficient: {ari_S:.4f}")
         if best_dbi_k is not None:
             kmeans_D = KMeans(n_clusters=best_dbi_k, n_init=50, random_state=42).fit(self.X)
             models.append(kmeans_D)
             names.append('Davies-Bouldin Index')
+            ari_D = adjusted_rand_score(self.target.labels_, kmeans_D.labels_)
+            print(f"Adjusted Rand Index (ARI) for Davies-Bouldin Index: {ari_D:.4f}")
         if best_ch_k is not None:
             kmeans_C = KMeans(n_clusters=best_ch_k, n_init=50, random_state=42).fit(self.X)
             models.append(kmeans_C)
             names.append('Calinski-Harabasz Index')
+            ari_C = adjusted_rand_score(self.target.labels_, kmeans_C.labels_)
+            print(f"Adjusted Rand Index (ARI) for Calinski-Harabasz Index: {ari_C:.4f}")
         if gap_k_val is not None:
             kmeans_G = KMeans(n_clusters=gap_k_val, n_init=50, random_state=42).fit(self.X)
             models.append(kmeans_G)
             names.append('Gap Statistic')
+            ari_G = adjusted_rand_score(self.target.labels_, kmeans_G.labels_)
+            print(f"Adjusted Rand Index (ARI) for Gap Statistic Method: {ari_G:.4f}")
 
+        
         # Terminal Profile Logging
         print(f"\nBLOBS: Total True Clusters Generated: {len(np.unique(self.y[self.y != -1]))}")
         print(f"BLOBS: Total Data Points: {len(self.y)}")
@@ -219,49 +233,56 @@ class BenchmarkDataset:
             percentage = (count / len(self.y)) * 100
             print(f"  Blob {b_id}: {count} points ({percentage:.1f}%)")
 
-        # Dynamic Grid Layout Sizing based on successful models
-        num_plots = len(models)
-        fig, axes = plt.subplots(1, num_plots, figsize=(25, 6), squeeze=False)
-        fig.suptitle(f"Dataset Clustering Comparisons - Scenario: {self.scenario.upper()}", fontsize=14, fontweight='bold')
+        '''
+                # Dynamic Grid Layout Sizing with empty array safety switch
+                num_plots = len(models)
+                if num_plots == 0:
+                    print("Warning: No valid cluster counts found. Skipping plots.")
+                    return
+        
+                fig, axes = plt.subplots(1, num_plots, figsize=(4 * num_plots, 6), squeeze=False)
+                fig.suptitle(f"Dataset Clustering Comparisons - Scenario: {self.scenario.upper()}", fontsize=14, fontweight='bold')
+        
+                # Loop through all successful models sequentially using your dynamic array
+                for i in range(num_plots):
+                    ax = axes[0, i]
+                    current_labels = models[i].labels_  
+                    name = names[i]
+                    ax.set_aspect('auto')
+                    # Generate the scatter plot for blobs (plots dimension 1 and 2)
+                    scatter = ax.scatter(self.X[:, 0], self.X[:, 1], c=current_labels, cmap='viridis', edgecolors='k', alpha=0.8)
+                    ax.set_title(f"{name}\n(k={len(np.unique(current_labels))})", fontsize=10)
+                    ax.set_xlabel("Dimension 1")
+                    ax.set_ylabel("Dimension 2")
+                    
+                    # Extract Matplotlib's internal handles and handle indexes safely
+                    handles, handle_labels = scatter.legend_elements()
+                    
+                    # FIX: Pull label mapping keys straight from matplotlib's handle tracking format: '$\\mathdefault{0}$' -> 0
+                    clean_handle_ids = [int(lh.replace('$\\mathdefault{', '').replace('}$', '')) for lh in handle_labels]
+                    
+                    legend_labels = []
+                    for cluster_id in clean_handle_ids:
+                        total_pts = np.sum(current_labels == cluster_id)
+                        true_species_inside = self.y[current_labels == cluster_id]
+                        unique_species, species_counts = np.unique(true_species_inside, return_counts=True)
+                        
+                        # Maps exactly how many ground truth points landed in this guess group
+                        breakdown_parts = [f"{count} Class {s_idx}" for s_idx, count in zip(unique_species, species_counts)]
+                        legend_labels.append(f"C{cluster_id} ({total_pts} pts: {' + '.join(breakdown_parts)})")
+                        
+                    # Apply the legend below each individual subplot seamlessly
+                    ax.legend(handles, legend_labels, loc='upper center', bbox_to_anchor=(0.5, -0.22), fontsize=6.5, ncol=1)
+        
+                # Adjusted padding configurations so the low-hanging legend boxes don't truncate
+                plt.tight_layout()
+                plt.subplots_adjust(bottom=0.3)
+                plt.show()
+                '''
 
-        # Loop through all successful models sequentially using your dynamic array
-        for i in range(num_plots):
-            ax = axes[0, i]
-            current_labels = models[i].labels_  # Fixed: Pulled dynamically from models list
-            name = names[i]
-            ax.set_aspect('auto')
-            # Generate the scatter plot for blobs (plots dimension 1 and 2)
-            scatter = ax.scatter(self.X[:, 0], self.X[:, 1], c=current_labels, cmap='viridis', edgecolors='k', alpha=0.8)
-            ax.set_title(f"{name}\n(k={len(np.unique(current_labels))})", fontsize=10)
-            ax.set_xlabel("Dimension 1")
-            ax.set_ylabel("Dimension 2")
-            
-            # Compute composition breakdown matrix for the legend labels
-            unique_clusters = np.unique(current_labels)
-            legend_labels = []
-            
-            for cluster_id in unique_clusters:
-                total_pts = np.sum(current_labels == cluster_id)
-                true_species_inside = self.y[current_labels == cluster_id]
-                unique_species, species_counts = np.unique(true_species_inside, return_counts=True)
-                
-                # Maps exactly how many ground truth points landed in this guess group
-                breakdown_parts = [f"{count} Class {s_idx}" for s_idx, count in zip(unique_species, species_counts)]
-                legend_labels.append(f"C{cluster_id} ({total_pts} pts: {' + '.join(breakdown_parts)})")
-                # Removed the premature "break" statement so all clusters are parsed
-                
-            # Apply the legend below each individual subplot seamlessly
-            handles, _ = scatter.legend_elements()
-            ax.legend(handles, legend_labels, loc='upper center', bbox_to_anchor=(0.5, -0.22), fontsize=6.5, ncol=1)
-
-        plt.tight_layout()
-        plt.show()
-
-# --- MAIN AUTOMATED RUNNER ---
 scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
+
 for scenario in scenarios:
-    print(f"\n" + "="*60)
-    print(f"=== Generating Benchmark Dataset for Scenario: {scenario.upper()} ===")
-    print("="*60)
-    test = BenchmarkDataset(scenario)
-    test.generate_benchmark_datasets()
+    print(f"\n\n--- Running Benchmark for Scenario: {scenario} ---")
+    test = BenchmarkDataset(scenario=scenario, n_clusters=10, n_features=10, n_samples=1000, random_state=42)
+    test.km_methods()
