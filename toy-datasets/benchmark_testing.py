@@ -233,53 +233,6 @@ class BenchmarkDataset:
             percentage = (count / len(self.y)) * 100
             print(f"  Blob {b_id}: {count} points ({percentage:.1f}%)")
 
-        '''
-                # Dynamic Grid Layout Sizing with empty array safety switch
-                num_plots = len(models)
-                if num_plots == 0:
-                    print("Warning: No valid cluster counts found. Skipping plots.")
-                    return
-        
-                fig, axes = plt.subplots(1, num_plots, figsize=(4 * num_plots, 6), squeeze=False)
-                fig.suptitle(f"Dataset Clustering Comparisons - Scenario: {self.scenario.upper()}", fontsize=14, fontweight='bold')
-        
-                # Loop through all successful models sequentially using your dynamic array
-                for i in range(num_plots):
-                    ax = axes[0, i]
-                    current_labels = models[i].labels_  
-                    name = names[i]
-                    ax.set_aspect('auto')
-                    # Generate the scatter plot for blobs (plots dimension 1 and 2)
-                    scatter = ax.scatter(self.X[:, 0], self.X[:, 1], c=current_labels, cmap='viridis', edgecolors='k', alpha=0.8)
-                    ax.set_title(f"{name}\n(k={len(np.unique(current_labels))})", fontsize=10)
-                    ax.set_xlabel("Dimension 1")
-                    ax.set_ylabel("Dimension 2")
-                    
-                    # Extract Matplotlib's internal handles and handle indexes safely
-                    handles, handle_labels = scatter.legend_elements()
-                    
-                    # FIX: Pull label mapping keys straight from matplotlib's handle tracking format: '$\\mathdefault{0}$' -> 0
-                    clean_handle_ids = [int(lh.replace('$\\mathdefault{', '').replace('}$', '')) for lh in handle_labels]
-                    
-                    legend_labels = []
-                    for cluster_id in clean_handle_ids:
-                        total_pts = np.sum(current_labels == cluster_id)
-                        true_species_inside = self.y[current_labels == cluster_id]
-                        unique_species, species_counts = np.unique(true_species_inside, return_counts=True)
-                        
-                        # Maps exactly how many ground truth points landed in this guess group
-                        breakdown_parts = [f"{count} Class {s_idx}" for s_idx, count in zip(unique_species, species_counts)]
-                        legend_labels.append(f"C{cluster_id} ({total_pts} pts: {' + '.join(breakdown_parts)})")
-                        
-                    # Apply the legend below each individual subplot seamlessly
-                    ax.legend(handles, legend_labels, loc='upper center', bbox_to_anchor=(0.5, -0.22), fontsize=6.5, ncol=1)
-        
-                # Adjusted padding configurations so the low-hanging legend boxes don't truncate
-                plt.tight_layout()
-                plt.subplots_adjust(bottom=0.3)
-                plt.show()
-                '''
-
 scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
 
 for scenario in scenarios:
