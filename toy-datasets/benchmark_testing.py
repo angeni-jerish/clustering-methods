@@ -106,41 +106,50 @@ class BenchmarkDataset:
         n, d = self.X.shape
 
         # 1. Hopkins Statistic
-        m = int(n * sampling_ratio)
-        nn = NearestNeighbors(n_neighbors=2).fit(self.X)
-        real_indices = rng.choice(n, size=m, replace=False)
-        distances, _ = nn.kneighbors(self.X[real_indices], n_neighbors=2)
-        w = distances[:, 1]
+        # Modified to run repeatedly across 20 different random samples
+        hopkins_trials = []
+        num_iterations = 20
 
-        min_bounds = self.X.min(axis=0)
-        max_bounds = self.X.max(axis=0)
-        X_uniform = rng.uniform(min_bounds, max_bounds, size=(m, d))
-        u_distances, _ = nn.kneighbors(X_uniform, n_neighbors=1)
-        u = u_distances[:, 0]
+        for _ in range(num_iterations):
+            m = int(n * sampling_ratio)
+            nn = NearestNeighbors(n_neighbors=2).fit(self.X)
+            real_indices = rng.choice(n, size=m, replace=False)
+            distances, _ = nn.kneighbors(self.X[real_indices], n_neighbors=2)
+            w = distances[:, 1]
 
-        sum_u, sum_w = np.sum(u), np.sum(w)
-        hopkins = sum_u / (sum_u + sum_w) if (sum_u + sum_w) > 0 else 0.5
+            min_bounds = self.X.min(axis=0)
+            max_bounds = self.X.max(axis=0)
+            X_uniform = rng.uniform(min_bounds, max_bounds, size=(m, d))
+            u_distances, _ = nn.kneighbors(X_uniform, n_neighbors=1)
+            u = u_distances[:, 0]
 
-        # 2. Distance Concentration
-        pairwise_dist = pdist(self.X, metric="euclidean")
-        mean_dist = np.mean(pairwise_dist)
-        dist_concentration = (
-            np.std(pairwise_dist) / mean_dist if mean_dist > 0 else 0
-        )
+            sum_u, sum_w = np.sum(u), np.sum(w)
+            trial_score = sum_u / (sum_u + sum_w) if (sum_u + sum_w) > 0 else 0.5
+            hopkins_trials.append(trial_score)
 
-        # 3. PCA Spectrum (Full vector returned)
-        pca = PCA().fit(self.X)
-        pca_spectrum = pca.explained_variance_ratio_
+            # The stable, final Hopkins Statistic
+            hopkins = np.mean(hopkins_trials)
 
-        # 4. Outlier Rate
-        iso = IsolationForest(contamination="auto", random_state=self.random_state)
-        outlier_rate = np.mean(iso.fit_predict(self.X) == -1)
+            # 2. Distance Concentration
+            pairwise_dist = pdist(self.X, metric="euclidean")
+            mean_dist = np.mean(pairwise_dist)
+            dist_concentration = (
+                np.std(pairwise_dist) / mean_dist if mean_dist > 0 else 0
+            )
 
-        # 5. Local-Density Variation
-        lof = LocalOutlierFactor(n_neighbors=min(20, n - 1))
-        lof.fit_predict(self.X)
-        local_densities = -lof.negative_outlier_factor_
-        density_variation = np.var(local_densities)
+            # 3. PCA Spectrum (Full vector returned)
+            pca = PCA().fit(self.X)
+            pca_spectrum = pca.explained_variance_ratio_
+
+            # 4. Outlier Rate
+            iso = IsolationForest(contamination="auto", random_state=self.random_state)
+            outlier_rate = np.mean(iso.fit_predict(self.X) == -1)
+
+            # 5. Local-Density Variation
+            lof = LocalOutlierFactor(n_neighbors=min(20, n - 1))
+            lof.fit_predict(self.X)
+            local_densities = -lof.negative_outlier_factor_
+            density_variation = np.var(local_densities)
 
         return {
             print(f"Hopkins Statistic: {hopkins:.3f}"),
