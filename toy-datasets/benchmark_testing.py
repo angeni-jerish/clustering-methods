@@ -10,8 +10,6 @@ class BenchmarkDataset:
         self.X, self.y = self.choose_scenario()
         self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state).fit(self.X)
 
-    def get_target(self):
-        return self.target
     
     #Expecting 3 clusters, 10 features, 1000 samples
     def choose_scenario(self):
@@ -69,7 +67,6 @@ class BenchmarkDataset:
         # 6. Size Imbalance: First cluster gets 90%, remaining points split equally among the rest
         elif self.scenario == "size_imbalance":
             X_list, y_list = [], []
-            
             # Cluster 0 gets 90% dominance
             size_dominant = int(self.n_samples * 0.90)
             # Remaining clusters share the residual 10% evenly
@@ -102,6 +99,56 @@ class BenchmarkDataset:
         # Standardize data so scale differences don't mask metric behavior
         X_scaled = StandardScaler().fit_transform(X)
         return X_scaled, y
+
+    def get_meta_features(self, sampling_ratio=0.1):
+        """Computes the five required data landscape properties."""
+        rng = np.random.default_rng(self.random_state)
+        n, d = self.X.shape
+
+        # 1. Hopkins Statistic
+        m = int(n * sampling_ratio)
+        nn = NearestNeighbors(n_neighbors=2).fit(self.X)
+        real_indices = rng.choice(n, size=m, replace=False)
+        distances, _ = nn.kneighbors(self.X[real_indices], n_neighbors=2)
+        w = distances[:, 1]
+
+        min_bounds = self.X.min(axis=0)
+        max_bounds = self.X.max(axis=0)
+        X_uniform = rng.uniform(min_bounds, max_bounds, size=(m, d))
+        u_distances, _ = nn.kneighbors(X_uniform, n_neighbors=1)
+        u = u_distances[:, 0]
+
+        sum_u, sum_w = np.sum(u), np.sum(w)
+        hopkins = sum_u / (sum_u + sum_w) if (sum_u + sum_w) > 0 else 0.5
+
+        # 2. Distance Concentration
+        pairwise_dist = pdist(self.X, metric="euclidean")
+        mean_dist = np.mean(pairwise_dist)
+        dist_concentration = (
+            np.std(pairwise_dist) / mean_dist if mean_dist > 0 else 0
+        )
+
+        # 3. PCA Spectrum (Full vector returned)
+        pca = PCA().fit(self.X)
+        pca_spectrum = pca.explained_variance_ratio_
+
+        # 4. Outlier Rate
+        iso = IsolationForest(contamination="auto", random_state=self.random_state)
+        outlier_rate = np.mean(iso.fit_predict(self.X) == -1)
+
+        # 5. Local-Density Variation
+        lof = LocalOutlierFactor(n_neighbors=min(20, n - 1))
+        lof.fit_predict(self.X)
+        local_densities = -lof.negative_outlier_factor_
+        density_variation = np.var(local_densities)
+
+        return {
+            print(f"Hopkins Statistic: {hopkins:.3f}"),
+            print(f"Distance Concentration: {dist_concentration:.3f}"),
+            print(f"PCA Spectrum: {pca_spectrum}"),
+            print(f"Outlier Rate: {outlier_rate:.3f}"),
+            print(f"Local Density Variation: {density_variation:.3f}"),
+        }
 
     def km_methods(self):
         inertia_scores = []
@@ -238,4 +285,5 @@ scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_vari
 for scenario in scenarios:
     print(f"\n\n--- Running Benchmark for Scenario: {scenario} ---")
     test = BenchmarkDataset(scenario=scenario, n_clusters=10, n_features=10, n_samples=1000, random_state=42)
-    test.km_methods()
+    test.get_meta_features()
+    #test.km_methods()
