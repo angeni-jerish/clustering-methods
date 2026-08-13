@@ -1,7 +1,7 @@
 from clustering_methods import *
 
 class BenchmarkDataset:
-    def __init__(self, scenario="baseline", n_clusters=10, n_features=10, n_samples=1000, random_state=42):
+    def __init__(self, scenario="baseline", n_clusters=10, n_features=2, n_samples=1000, random_state=42):
         self.scenario = scenario
         self.n_clusters = n_clusters
         self.n_features = n_features
@@ -11,7 +11,7 @@ class BenchmarkDataset:
         self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state).fit(self.X)
 
     
-    #Expecting 3 clusters, 10 features, 1000 samples
+    #Expecting 10 clusters, 10 features, 1000 samples
     def choose_scenario(self):
         if self.scenario == "baseline":
             X, y = make_blobs(n_samples=self.n_samples, n_features=self.n_features, centers=self.n_clusters, 
@@ -19,7 +19,7 @@ class BenchmarkDataset:
             
         # 2. Dimensionality: Passed via n_features parameter
         elif self.scenario == "high_dim":
-            X, y = make_blobs(n_samples=self.n_samples, n_features=20, centers=self.n_clusters, 
+            X, y = make_blobs(n_samples=self.n_samples, n_features=4, centers=self.n_clusters, 
                             cluster_std=1.0, random_state=self.random_state)
             
         # 3. Cluster Overlap: High standard deviation forces boundaries to merge
@@ -223,19 +223,16 @@ class BenchmarkDataset:
             temp_model = KMeans(n_clusters=k, n_init=50, random_state=42).fit(self.X)
             labels = temp_model.labels_
             sil_score = silhouette_score(self.X, labels)
-            print(f"Testing k={k} -> Silhouette Score: {sil_score:.3f}")
             if sil_score > best_score:
                 best_score = sil_score
                 best_k = k
             # DBI
             dbi_score = davies_bouldin_score(self.X, labels)
-            print(f"Testing k={k} -> Davies-Bouldin Index: {dbi_score:.3f}")
             if dbi_score < best_dbi_score: 
                 best_dbi_score, best_dbi_k = dbi_score, k
 
             # CH
             ch_score = calinski_harabasz_score(self.X, labels)
-            print(f"Testing k={k} -> Calinski-Harabasz Index: {ch_score:.3f}")
             if ch_score > best_ch_score: 
                 best_ch_score, best_ch_k = ch_score, k
 
@@ -280,7 +277,7 @@ class BenchmarkDataset:
             ari_G = adjusted_rand_score(self.target.labels_, kmeans_G.labels_)
             print(f"Adjusted Rand Index (ARI) for Gap Statistic Method: {ari_G:.4f}")
 
-        
+        '''
         # Terminal Profile Logging
         print(f"\nBLOBS: Total True Clusters Generated: {len(np.unique(self.y[self.y != -1]))}")
         print(f"BLOBS: Total Data Points: {len(self.y)}")
@@ -288,7 +285,8 @@ class BenchmarkDataset:
         for b_id, count in zip(unique_blobs, blob_counts):
             percentage = (count / len(self.y)) * 100
             print(f"  Blob {b_id}: {count} points ({percentage:.1f}%)")
-
+        '''
+'''
 scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
 
 for scenario in scenarios:
@@ -296,4 +294,14 @@ for scenario in scenarios:
     test = BenchmarkDataset(scenario=scenario, n_clusters=10, n_features=10, n_samples=1000, random_state=42)
     test.get_meta_features()
     test.km_methods()
+'''
+#Looking at individual scenarios for analysis
+print(f"\n\n--- Running Benchmark for Scenario: {"baseline"} ---")
+test = BenchmarkDataset(scenario="baseline", n_clusters=10, n_features=10, n_samples=1000, random_state=42)
+test.get_meta_features()
+test.km_methods()
 
+print(f"\n\n--- Running Benchmark for Scenario: {"high_dim"} ---")
+test = BenchmarkDataset(scenario="high_dim", n_clusters=10, n_features=10, n_samples=1000, random_state=42)
+test.get_meta_features()
+test.km_methods()
