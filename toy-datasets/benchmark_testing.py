@@ -1,14 +1,15 @@
 from clustering_methods import *
 
 class BenchmarkDataset:
-    def __init__(self, scenario="baseline", n_clusters=10, n_features=2, n_samples=1000, random_state=42):
+    def __init__(self, scenario="baseline", n_clusters=10, n_features=2, n_samples=1000, knob_value=1.0,random_state=42):
         self.scenario = scenario
         self.n_clusters = n_clusters
         self.n_features = n_features
         self.n_samples = n_samples
         self.random_state = random_state
+        self.knob_value = knob_value
         self.X, self.y = self.choose_scenario()
-        self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state).fit(self.X)
+        self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state, n_init='auto').fit(self.X)
 
     
     #Expecting 10 clusters, 10 features, 1000 samples
@@ -19,28 +20,29 @@ class BenchmarkDataset:
             
         # 2. Dimensionality: Passed via n_features parameter
         elif self.scenario == "high_dim":
-            X, y = make_blobs(n_samples=self.n_samples, n_features=4, centers=self.n_clusters, 
+            X, y = make_blobs(n_samples=self.n_samples, n_features=self.knob_value, centers=self.n_clusters, 
                             cluster_std=1.0, random_state=self.random_state)
             
         # 3. Cluster Overlap: High standard deviation forces boundaries to merge
         elif self.scenario == "high_overlap":
             X, y = make_blobs(n_samples=self.n_samples, n_features=self.n_features, centers=self.n_clusters, 
-                            cluster_std=3.5, random_state=self.random_state)
+                            cluster_std=self.knob_value, random_state=self.random_state)
             
         # 4. Synthetic Noise: Add completely random uniform noise features or rows
         elif self.scenario == "with_noise":
             X, y = make_blobs(n_samples=self.n_samples, n_features=self.n_features, centers=self.n_clusters, 
                             cluster_std=1.0, random_state=self.random_state)
-            noise = np.random.uniform(low=X.min(), high=X.max(), size=(int(self.n_samples * 0.15), self.n_features))
+            noise = np.random.uniform(low=X.min(), high=X.max(), size=(int(self.n_samples * self.knob_value), self.n_features))
             X = np.vstack([X, noise])
             y = np.concatenate([y, -1 * np.ones(noise.shape[0], dtype=int)]) # Noise marked as -1
             
         elif self.scenario == "density_variation":
+            #generated code, varied density by changing the standard deviation of each cluster
             X_list, y_list = [], []
             samples_per_cluster = self.n_samples // self.n_clusters
             
             for i in range(self.n_clusters):
-                dynamic_std = 0.5 + (i * 1.5) 
+                dynamic_std = 0.5 + (i * self.knob_value)
                 angle = (2 * np.pi * i) / self.n_clusters
                 
                 separation_radius = 25.0 / np.sqrt(self.n_clusters)
@@ -49,11 +51,9 @@ class BenchmarkDataset:
                 center_coord = [separation_radius * np.cos(angle), separation_radius * np.sin(angle)]
                 
                 if self.n_features > 2:
-                    # FIX: Keep padding flat as a 1D list, then add them directly
                     padding = [0] * (self.n_features - 2)
                     center_coord = center_coord + padding
 
-                # FIX: Wrap the completed 1D list inside an outer array layout to make it 2D
                 center_coord = [center_coord]
 
                 X_c, y_c = make_blobs(n_samples=samples_per_cluster, n_features=self.n_features, 
@@ -68,10 +68,10 @@ class BenchmarkDataset:
         elif self.scenario == "size_imbalance":
             X_list, y_list = [], []
             # Cluster 0 gets 90% dominance
-            size_dominant = int(self.n_samples * 0.90)
-            # Remaining clusters share the residual 10% evenly
+            size_dominant = int(self.n_samples * self.knob_value)  # knob_value should be between 0.1 and 0.9
+            # Remaining clusters share the residual % evenly
             remaining_clusters = self.n_clusters - 1
-            size_minority = int(self.n_samples * 0.10) // remaining_clusters if remaining_clusters > 0 else 0
+            size_minority = int(self.n_samples * (1.0 - self.knob_value)) // remaining_clusters if remaining_clusters > 0 else 0
             
             for i in range(self.n_clusters):
                 current_size = size_dominant if i == 0 else size_minority
@@ -80,11 +80,12 @@ class BenchmarkDataset:
                 
                 # Space out centers evenly across a geometric layout
                 angle = (2 * np.pi * i) / self.n_clusters
-                center_coord = [[10 * np.cos(angle), 10 * np.sin(angle)]]
+                center_coord = [10 * np.cos(angle), 10 * np.sin(angle)]
                 
                 if self.n_features > 2:
-                    padding = [[0] * (self.n_features - 2)]
-                    center_coord = [center_coord[0] + padding[0]]
+                    padding = [0] * (self.n_features - 2)
+                    center_coord = center_coord + padding
+                center_coord = [center_coord]
 
                 X_c, y_c = make_blobs(n_samples=current_size, n_features=self.n_features, 
                                       centers=center_coord, cluster_std=1.0, random_state=self.random_state + i)
@@ -109,10 +110,9 @@ class BenchmarkDataset:
         # Modified to run repeatedly across 20 different random samples
         hopkins_trials = []
         num_iterations = 20
-
+        m = int(n * sampling_ratio)
+        nn = NearestNeighbors(n_neighbors=2).fit(self.X)
         for _ in range(num_iterations):
-            m = int(n * sampling_ratio)
-            nn = NearestNeighbors(n_neighbors=2).fit(self.X)
             real_indices = rng.choice(n, size=m, replace=False)
             distances, _ = nn.kneighbors(self.X[real_indices], n_neighbors=2)
             w = distances[:, 1]
@@ -127,37 +127,44 @@ class BenchmarkDataset:
             trial_score = sum_u / (sum_u + sum_w) if (sum_u + sum_w) > 0 else 0.5
             hopkins_trials.append(trial_score)
 
-            # The stable, final Hopkins Statistic
-            hopkins = np.mean(hopkins_trials)
+        # The stable, final Hopkins Statistic
+        hopkins = np.mean(hopkins_trials)
 
-            # 2. Distance Concentration
-            pairwise_dist = pdist(self.X, metric="euclidean")
-            mean_dist = np.mean(pairwise_dist)
-            dist_concentration = (
-                np.std(pairwise_dist) / mean_dist if mean_dist > 0 else 0
-            )
+        # 2. Distance Concentration
+        pairwise_dist = pdist(self.X, metric="euclidean")
+        mean_dist = np.mean(pairwise_dist)
+        dist_concentration = (
+            np.std(pairwise_dist) / mean_dist if mean_dist > 0 else 0
+        )
 
-            # 3. PCA Spectrum (Full vector returned)
-            pca = PCA().fit(self.X)
-            pca_spectrum = pca.explained_variance_ratio_
+        # 3. PCA Spectrum (Full vector returned)
+        pca = PCA().fit(self.X)
+        pca_spectrum = pca.explained_variance_ratio_
 
-            # 4. Outlier Rate
-            iso = IsolationForest(contamination="auto", random_state=self.random_state)
-            outlier_rate = np.mean(iso.fit_predict(self.X) == -1)
+        # 4. Outlier Rate
+        iso = IsolationForest(contamination="auto", random_state=self.random_state)
+        outlier_rate = np.mean(iso.fit_predict(self.X) == -1)
 
-            # 5. Local-Density Variation
-            lof = LocalOutlierFactor(n_neighbors=min(20, n - 1))
-            lof.fit_predict(self.X)
-            local_densities = -lof.negative_outlier_factor_
-            density_variation = np.var(local_densities)
+        # 5. Local-Density Variation
+        lof = LocalOutlierFactor(n_neighbors=min(20, n - 1))
+        lof.fit_predict(self.X)
+        local_densities = -lof.negative_outlier_factor_
+        density_variation = np.var(local_densities)
+
+        print(f"Hopkins Statistic: {hopkins:.3f}")
+        print(f"Distance Concentration: {dist_concentration:.3f}")
+        print(f"PCA Spectrum: {pca_spectrum}")
+        print(f"Outlier Rate: {outlier_rate:.3f}")
+        print(f"Local Density Variation: {density_variation:.3f}")
 
         return {
-            print(f"Hopkins Statistic: {hopkins:.3f}"),
-            print(f"Distance Concentration: {dist_concentration:.3f}"),
-            print(f"PCA Spectrum: {pca_spectrum}"),
-            print(f"Outlier Rate: {outlier_rate:.3f}"),
-            print(f"Local Density Variation: {density_variation:.3f}"),
+            "hopkins": hopkins,
+            "dist_concentration": dist_concentration,
+            "pca_spectrum": pca_spectrum,
+            "outlier_rate": outlier_rate,
+            "density_variation": density_variation
         }
+    
 
     def km_methods(self):
         inertia_scores = []
@@ -286,22 +293,18 @@ class BenchmarkDataset:
             percentage = (count / len(self.y)) * 100
             print(f"  Blob {b_id}: {count} points ({percentage:.1f}%)")
         '''
-'''
-scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
 
+#Testing
+scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
+dimensions = [2, 4, 8, 16, 32]
+overlap_levels = [1.0, 2.0, 3.0, 4.0, 5.0]
+noise_levels = [0.02, 0.08, 0.15, 0.25, 0.40]
+density_levels = [0.2, 0.6, 1.2, 1.8, 2.5]
+imbalance_levels = [0.10, 0.35, 0.60, 0.85, 0.96]
+
+#seeds = [42, 100, 2026, 999]
 for scenario in scenarios:
     print(f"\n\n--- Running Benchmark for Scenario: {scenario} ---")
     test = BenchmarkDataset(scenario=scenario, n_clusters=10, n_features=10, n_samples=1000, random_state=42)
     test.get_meta_features()
     test.km_methods()
-'''
-#Looking at individual scenarios for analysis
-print(f"\n\n--- Running Benchmark for Scenario: {"baseline"} ---")
-test = BenchmarkDataset(scenario="baseline", n_clusters=10, n_features=10, n_samples=1000, random_state=42)
-test.get_meta_features()
-test.km_methods()
-
-print(f"\n\n--- Running Benchmark for Scenario: {"high_dim"} ---")
-test = BenchmarkDataset(scenario="high_dim", n_clusters=10, n_features=10, n_samples=1000, random_state=42)
-test.get_meta_features()
-test.km_methods()
