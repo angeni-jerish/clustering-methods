@@ -1,4 +1,4 @@
-from clustering_methods import *
+from imports import *
 
 class BenchmarkDataset:
     def __init__(self, scenario="baseline", n_clusters=10, n_features=2, n_samples=1000, knob_value=1.0,random_state=42):
@@ -249,40 +249,53 @@ class BenchmarkDataset:
         print(f"The optimal num of clusters (By Davies-Bouldin Index testing): {best_dbi_k}")
         print(f"The optimal num of clusters (By Calinski-Harabasz Index testing): {best_ch_k}")
 
-
+        
         # K-Means Clustering Models (Dynamically packed)
-        models = []
-        names = []
+        #models = []
+        #names = []
         if auto_k_val is not None:
             kmeans_E = KMeans(n_clusters=auto_k_val, n_init=50, random_state=42).fit(self.X)
-            models.append(kmeans_E)
-            names.append('Elbow Method')
+            #models.append(kmeans_E)
+            #names.append('Elbow Method')
             ari_E = adjusted_rand_score(self.target.labels_, kmeans_E.labels_)
-            print(f"Adjusted Rand Index (ARI) for Elbow Method: {ari_E:.4f}")
+            #print(f"Adjusted Rand Index (ARI) for Elbow Method: {ari_E:.4f}")
         if best_k is not None:
             kmeans_S = KMeans(n_clusters=best_k, n_init=50, random_state=42).fit(self.X)
-            models.append(kmeans_S)
-            names.append('Silhouette Coefficient')
+            #models.append(kmeans_S)
+            #names.append('Silhouette Coefficient')
             ari_S = adjusted_rand_score(self.target.labels_, kmeans_S.labels_)
-            print(f"Adjusted Rand Index (ARI) for Silhouette Coefficient: {ari_S:.4f}")
+            #print(f"Adjusted Rand Index (ARI) for Silhouette Coefficient: {ari_S:.4f}")
         if best_dbi_k is not None:
             kmeans_D = KMeans(n_clusters=best_dbi_k, n_init=50, random_state=42).fit(self.X)
-            models.append(kmeans_D)
-            names.append('Davies-Bouldin Index')
+            #models.append(kmeans_D)
+            #names.append('Davies-Bouldin Index')
             ari_D = adjusted_rand_score(self.target.labels_, kmeans_D.labels_)
-            print(f"Adjusted Rand Index (ARI) for Davies-Bouldin Index: {ari_D:.4f}")
+            #print(f"Adjusted Rand Index (ARI) for Davies-Bouldin Index: {ari_D:.4f}")
         if best_ch_k is not None:
             kmeans_C = KMeans(n_clusters=best_ch_k, n_init=50, random_state=42).fit(self.X)
-            models.append(kmeans_C)
-            names.append('Calinski-Harabasz Index')
+            #models.append(kmeans_C)
+            #names.append('Calinski-Harabasz Index')
             ari_C = adjusted_rand_score(self.target.labels_, kmeans_C.labels_)
-            print(f"Adjusted Rand Index (ARI) for Calinski-Harabasz Index: {ari_C:.4f}")
+            #print(f"Adjusted Rand Index (ARI) for Calinski-Harabasz Index: {ari_C:.4f}")
         if gap_k_val is not None:
             kmeans_G = KMeans(n_clusters=gap_k_val, n_init=50, random_state=42).fit(self.X)
-            models.append(kmeans_G)
-            names.append('Gap Statistic')
+            #models.append(kmeans_G)
+            #names.append('Gap Statistic')
             ari_G = adjusted_rand_score(self.target.labels_, kmeans_G.labels_)
-            print(f"Adjusted Rand Index (ARI) for Gap Statistic Method: {ari_G:.4f}")
+            #print(f"Adjusted Rand Index (ARI) for Gap Statistic Method: {ari_G:.4f}")
+
+        return {
+            "k_silhouette": best_k,
+            "ari_silhouette": ari_S if best_k is not None else None,
+            "k_gap": gap_k_val,
+            "ari_gap": ari_G if gap_k_val is not None else None,
+            "k_elbow": auto_k_val,
+            "ari_elbow": ari_E if auto_k_val is not None else None,
+            "k_dbi": best_dbi_k,
+            "ari_dbi": ari_D if best_dbi_k is not None else None,
+            "k_ch": best_ch_k,
+            "ari_ch": ari_C if best_ch_k is not None else None
+        }
 
         '''
         # Terminal Profile Logging
@@ -293,18 +306,3 @@ class BenchmarkDataset:
             percentage = (count / len(self.y)) * 100
             print(f"  Blob {b_id}: {count} points ({percentage:.1f}%)")
         '''
-
-#Testing
-scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
-dimensions = [2, 4, 8, 16, 32]
-overlap_levels = [1.0, 2.0, 3.0, 4.0, 5.0]
-noise_levels = [0.02, 0.08, 0.15, 0.25, 0.40]
-density_levels = [0.2, 0.6, 1.2, 1.8, 2.5]
-imbalance_levels = [0.10, 0.35, 0.60, 0.85, 0.96]
-
-#seeds = [42, 100, 2026, 999]
-for scenario in scenarios:
-    print(f"\n\n--- Running Benchmark for Scenario: {scenario} ---")
-    test = BenchmarkDataset(scenario=scenario, n_clusters=10, n_features=10, n_samples=1000, random_state=42)
-    test.get_meta_features()
-    test.km_methods()

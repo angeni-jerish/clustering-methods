@@ -1,18 +1,14 @@
 import random as py_random  
-
 import matplotlib.pyplot as plt
 import sklearn
 from sklearn.datasets import load_iris, make_blobs, make_circles, make_moons
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score, adjusted_rand_score
-from sklearn.ensemble import IsolationForest
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from kneed import KneeLocator
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
 import numpy as np
-import scipy as sp 
-from scipy.spatial.distance import pdist
-from sklearn.neighbors import NearestNeighbors,LocalOutlierFactor
+
 
 #fixing issue with DBCV
 if not hasattr(np, 'float_'):
