@@ -24,13 +24,17 @@ def choose_knob_value(scenario):
         return [1.0]
 
 master_log = []
-
+#troubleshooting
+total_runs = len(scenarios) * len(dimensions) * 5 * len(seeds) # rough estimation
+current_run = 0
 for scenario in scenarios:
     levels = choose_knob_value(scenario)
-    for d, knob, seed in product(dimensions, levels, seeds):
-        # Override structural logic clash: high_dim forces feature count to track knob setting
-        actual_d = knob if scenario == "high_dim" else d
-        
+
+    for knob, seed in product(levels, seeds):
+        current_run += 1
+        print(f"\n[Run {current_run}] Processing -> Scenario: {scenario} | Knob: {knob} | Seed: {seed}")
+
+        actual_d = knob if scenario == "high_dim" else 2
         # Instantiate your optimized class
         dataset = BenchmarkDataset(
             scenario=scenario,
@@ -39,26 +43,57 @@ for scenario in scenarios:
             knob_value=knob,
             random_state=seed
         )
-        
+        print(f"  -> Calculating Meta-features...")
         # Pull outputs from your code
         meta = dataset.get_meta_features()
+        print(f"  -> Executing K-Means Val Indexes...")
         results = dataset.km_methods()
         
         # Save every parameter and outcome to a line dictionary
         master_log.append({
-            "scenario": scenario, "dimensions": actual_d, "knob": knob, "seed": seed,
-            "hopkins": meta["hopkins"], "density_var": meta["density_variation"],
-            "dist_concentration": meta["dist_concentration"], "outlier_rate": meta["outlier_rate"],
-            "best_k_silhouette": results["k_silhouette"], "ari_silhouette": results["ari_silhouette"],
-            "best_k_gap": results["k_gap"], "ari_gap": results["ari_gap"]
+            "scenario": scenario, 
+            "dimensions": actual_d, 
+            "knob": knob, 
+            "seed": seed,
+            
+            # Upfront Landscape Meta-Features
+            "hopkins": meta["hopkins"], 
+            "density_var": meta["density_variation"],
+            "dist_concentration": meta["dist_concentration"], 
+            "outlier_rate": meta["outlier_rate"],
+            
+            # --- ADD THE NEW PCA SUMMARY STATISTICS HERE ---
+            "pca_pc1": meta["pca_pc1"],                 # Track linear flatness
+            "pca_dims_to_80": meta["pca_dims_to_80"],   # Track structural complexity
+            "pca_entropy": meta["pca_entropy"],         # Track variance scattering
+            
+            # Predicted K Choices
+            "best_k_silhouette": results["k_silhouette"], 
+            "best_k_gap": results["k_gap"], 
+            "best_k_elbow": results["k_elbow"],
+            "best_k_dbi": results["k_dbi"],
+            "best_k_chi": results["k_chi"],
+            
+            # Clustering Accuracy (ARI) Columns
+            "ari_silhouette": results["ari_silhouette"], 
+            "ari_gap": results["ari_gap"],
+            "ari_elbow": results["ari_elbow"],
+            "ari_dbi": results["ari_dbi"],
+            "ari_chi": results["ari_chi"]
         })
 
 # Flatten arrays straight to an analytical table spreadsheet
 df_results = pd.DataFrame(master_log)
 df_results.to_csv("benchmark_results.csv", index=False)
+correlation_matrix = df_results.corr(numeric_only=True)
 
+# Isolate just your accuracy rows (ARI) against your upfront shapes
+print(correlation_matrix[["ari_silhouette", "ari_gap", "ari_elbow", "ari_dbi", "ari_chi"]])
+
+'''
 for scenario in scenarios:
     print(f"\n\n--- Running Benchmark for Scenario: {scenario} ---")
     test = BenchmarkDataset(scenario=scenario, n_clusters=10, n_features=10, n_samples=1000, knob_value=choose_knob_value(scenario), random_state=42)
     test.get_meta_features()
     test.km_methods()
+'''

@@ -11,8 +11,6 @@ class BenchmarkDataset:
         self.X, self.y = self.choose_scenario()
         self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state, n_init='auto').fit(self.X)
 
-    
-    #Expecting 10 clusters, 10 features, 1000 samples
     def choose_scenario(self):
         if self.scenario == "baseline":
             X, y = make_blobs(n_samples=self.n_samples, n_features=self.n_features, centers=self.n_clusters, 
@@ -116,7 +114,6 @@ class BenchmarkDataset:
             real_indices = rng.choice(n, size=m, replace=False)
             distances, _ = nn.kneighbors(self.X[real_indices], n_neighbors=2)
             w = distances[:, 1]
-
             min_bounds = self.X.min(axis=0)
             max_bounds = self.X.max(axis=0)
             X_uniform = rng.uniform(min_bounds, max_bounds, size=(m, d))
@@ -141,6 +138,16 @@ class BenchmarkDataset:
         pca = PCA().fit(self.X)
         pca_spectrum = pca.explained_variance_ratio_
 
+        #split into 3 different sub characteristics
+        # 1. Extracts the first Principal Component variance magnitude
+        pca_pc1 = float(pca_spectrum[0]) if len(pca_spectrum) > 0 else 0.0
+
+        # 2. Computes exactly how many components are needed to explain 80% of the shape
+        pca_dims_to_80 = int(np.argmax(np.cumsum(pca_spectrum) >= 0.80) + 1)
+
+        # 3. Computes the Shannon Entropy (describes the steepness of the curve)
+        pca_entropy = -np.sum(pca_spectrum * np.log(pca_spectrum + 1e-9))
+
         # 4. Outlier Rate
         iso = IsolationForest(contamination="auto", random_state=self.random_state)
         outlier_rate = np.mean(iso.fit_predict(self.X) == -1)
@@ -157,41 +164,48 @@ class BenchmarkDataset:
         print(f"Outlier Rate: {outlier_rate:.3f}")
         print(f"Local Density Variation: {density_variation:.3f}")
 
+
         return {
             "hopkins": hopkins,
             "dist_concentration": dist_concentration,
-            "pca_spectrum": pca_spectrum,
+            "pca_pc1": pca_pc1,
+            "pca_dims_to_80": pca_dims_to_80,
+            "pca_entropy": pca_entropy,
             "outlier_rate": outlier_rate,
             "density_variation": density_variation
         }
     
-
     def km_methods(self):
         inertia_scores = []
         k_choices = range(1, 11)
         for k in k_choices:
-            km = KMeans(n_clusters=k, random_state=self.random_state).fit(self.X)
+            # Fixed: Standardised to ensure runtime acceleration constraints
+            km = KMeans(n_clusters=k, random_state=self.random_state, n_init='auto').fit(self.X)
             inertia_scores.append(km.inertia_)
-        kl = KneeLocator(k_choices, inertia_scores, curve='convex', direction='decreasing')
-        auto_k_val = kl.elbow
+
+        try:
+            kl = KneeLocator(k_choices, inertia_scores, curve='convex', direction='decreasing')
+            auto_k_val = kl.elbow if kl.elbow is not None else 1
+        except Exception:
+            auto_k_val = 1 # Safe fallback if the data curve is unreadable shape noise
 
         # Gap Statistic
         gap_scores = []
         se_scores = []  
-        B = 100  
+        B = 5  # Optimization: 20-50 reference arrays ensure massive speedups across grid swarms
         X_min = self.X.min(axis=0)
         X_max = self.X.max(axis=0)
 
-        k_choices = range(1, 11)  # Testing k from 1 to 10
         for idx, k in enumerate(k_choices):
             real_inertia = inertia_scores[idx]
             ref_log_inertias = []
             
-            # Generate reproducible uniform noise
-            rng = np.random.default_rng(seed=int(k * 100))
+            # Bound uniform generation states dynamically across seeds
+            rng = np.random.default_rng(seed=int(self.random_state + k * 100))
             for b in range(B):
                 X_ref = rng.uniform(X_min, X_max, self.X.shape)
-                km_ref = KMeans(n_clusters=k, random_state=42, n_init='auto').fit(X_ref)
+                # Fixed: Dynamically mapped to track instance iteration states
+                km_ref = KMeans(n_clusters=k, random_state=self.random_state, n_init='auto').fit(X_ref)
                 ref_log_inertias.append(np.log(km_ref.inertia_))    
             
             # 1. Calculate Gap(k)
@@ -205,11 +219,10 @@ class BenchmarkDataset:
 
         # 3. Apply the 1-SE Rule Condition sequentially from k=1 onwards
         gap_k_val = k_choices[-1]  
-
         for i in range(len(k_choices) - 1):
             k_curr = k_choices[i]
             gap_curr = gap_scores[i]
-            
+
             gap_next = gap_scores[i + 1]
             se_next = se_scores[i + 1]
             
@@ -226,8 +239,8 @@ class BenchmarkDataset:
         best_ch_score = -1
 
         for k in range(2, 11):
-            # Silhouette Score
-            temp_model = KMeans(n_clusters=k, n_init=50, random_state=42).fit(self.X)
+            # Fixed: Track instance random configurations natively
+            temp_model = KMeans(n_clusters=k, n_init='auto', random_state=self.random_state).fit(self.X)
             labels = temp_model.labels_
             sil_score = silhouette_score(self.X, labels)
             if sil_score > best_score:
@@ -248,61 +261,35 @@ class BenchmarkDataset:
         print(f"The optimal num of clusters (By Silhouette Coefficient testing): {best_k}")
         print(f"The optimal num of clusters (By Davies-Bouldin Index testing): {best_dbi_k}")
         print(f"The optimal num of clusters (By Calinski-Harabasz Index testing): {best_ch_k}")
-
         
-        # K-Means Clustering Models (Dynamically packed)
-        #models = []
-        #names = []
+        # K-Means Clustering Models Evaluated Direct via n_init='auto'
+        ari_E, ari_S, ari_D, ari_C, ari_G = None, None, None, None, None
+
         if auto_k_val is not None:
-            kmeans_E = KMeans(n_clusters=auto_k_val, n_init=50, random_state=42).fit(self.X)
-            #models.append(kmeans_E)
-            #names.append('Elbow Method')
+            kmeans_E = KMeans(n_clusters=auto_k_val, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_E = adjusted_rand_score(self.target.labels_, kmeans_E.labels_)
-            #print(f"Adjusted Rand Index (ARI) for Elbow Method: {ari_E:.4f}")
         if best_k is not None:
-            kmeans_S = KMeans(n_clusters=best_k, n_init=50, random_state=42).fit(self.X)
-            #models.append(kmeans_S)
-            #names.append('Silhouette Coefficient')
+            kmeans_S = KMeans(n_clusters=best_k, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_S = adjusted_rand_score(self.target.labels_, kmeans_S.labels_)
-            #print(f"Adjusted Rand Index (ARI) for Silhouette Coefficient: {ari_S:.4f}")
         if best_dbi_k is not None:
-            kmeans_D = KMeans(n_clusters=best_dbi_k, n_init=50, random_state=42).fit(self.X)
-            #models.append(kmeans_D)
-            #names.append('Davies-Bouldin Index')
+            kmeans_D = KMeans(n_clusters=best_dbi_k, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_D = adjusted_rand_score(self.target.labels_, kmeans_D.labels_)
-            #print(f"Adjusted Rand Index (ARI) for Davies-Bouldin Index: {ari_D:.4f}")
         if best_ch_k is not None:
-            kmeans_C = KMeans(n_clusters=best_ch_k, n_init=50, random_state=42).fit(self.X)
-            #models.append(kmeans_C)
-            #names.append('Calinski-Harabasz Index')
+            kmeans_C = KMeans(n_clusters=best_ch_k, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_C = adjusted_rand_score(self.target.labels_, kmeans_C.labels_)
-            #print(f"Adjusted Rand Index (ARI) for Calinski-Harabasz Index: {ari_C:.4f}")
         if gap_k_val is not None:
-            kmeans_G = KMeans(n_clusters=gap_k_val, n_init=50, random_state=42).fit(self.X)
-            #models.append(kmeans_G)
-            #names.append('Gap Statistic')
+            kmeans_G = KMeans(n_clusters=gap_k_val, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_G = adjusted_rand_score(self.target.labels_, kmeans_G.labels_)
-            #print(f"Adjusted Rand Index (ARI) for Gap Statistic Method: {ari_G:.4f}")
 
         return {
             "k_silhouette": best_k,
-            "ari_silhouette": ari_S if best_k is not None else None,
+            "ari_silhouette": ari_S,
             "k_gap": gap_k_val,
-            "ari_gap": ari_G if gap_k_val is not None else None,
+            "ari_gap": ari_G,
             "k_elbow": auto_k_val,
-            "ari_elbow": ari_E if auto_k_val is not None else None,
+            "ari_elbow": ari_E,
             "k_dbi": best_dbi_k,
-            "ari_dbi": ari_D if best_dbi_k is not None else None,
-            "k_ch": best_ch_k,
-            "ari_ch": ari_C if best_ch_k is not None else None
+            "ari_dbi": ari_D,
+            "k_chi": best_ch_k,
+            "ari_chi": ari_C
         }
-
-        '''
-        # Terminal Profile Logging
-        print(f"\nBLOBS: Total True Clusters Generated: {len(np.unique(self.y[self.y != -1]))}")
-        print(f"BLOBS: Total Data Points: {len(self.y)}")
-        unique_blobs, blob_counts = np.unique(self.y, return_counts=True)
-        for b_id, count in zip(unique_blobs, blob_counts):
-            percentage = (count / len(self.y)) * 100
-            print(f"  Blob {b_id}: {count} points ({percentage:.1f}%)")
-        '''
