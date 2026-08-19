@@ -2,7 +2,7 @@ from benchmark_class import BenchmarkDataset
 from imports import *
 
 scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
-seeds = [42, 100, 2026, 999]
+seeds = [42, 100, 2026, 999, 7, 555, 31415, 8675309, 271828, 123456]
 dimensions = [2, 4, 8, 16, 32] 
 overlap_levels = [1.0, 2.0, 3.0, 4.0, 5.0] 
 noise_levels = [0.02, 0.08, 0.15, 0.25, 0.40] 
