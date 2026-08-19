@@ -9,8 +9,9 @@ class BenchmarkDataset:
         self.random_state = random_state
         self.knob_value = knob_value
         self.X, self.y = self.choose_scenario()
+        self.eval_mask = self.y != -1
         self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state, n_init='auto').fit(self.X)
-        self.target_ari = adjusted_rand_score(self.y, self.target.labels_)
+        self.target_ari = adjusted_rand_score(self.y[self.eval_mask], self.target.labels_[self.eval_mask])
     
     def choose_scenario(self):
         if self.scenario == "baseline":
@@ -268,19 +269,19 @@ class BenchmarkDataset:
 
         if auto_k_val is not None:
             kmeans_E = KMeans(n_clusters=auto_k_val, n_init='auto', random_state=self.random_state).fit(self.X)
-            ari_E = adjusted_rand_score(self.target.labels_, kmeans_E.labels_)
+            ari_E = adjusted_rand_score(self.y[self.eval_mask], kmeans_E.labels_[self.eval_mask])
         if best_k is not None:
             kmeans_S = KMeans(n_clusters=best_k, n_init='auto', random_state=self.random_state).fit(self.X)
-            ari_S = adjusted_rand_score(self.target.labels_, kmeans_S.labels_)
+            ari_S = adjusted_rand_score(self.y[self.eval_mask], kmeans_S.labels_[self.eval_mask])
         if best_dbi_k is not None:
             kmeans_D = KMeans(n_clusters=best_dbi_k, n_init='auto', random_state=self.random_state).fit(self.X)
-            ari_D = adjusted_rand_score(self.target.labels_, kmeans_D.labels_)
+            ari_D = adjusted_rand_score(self.y[self.eval_mask], kmeans_D.labels_[self.eval_mask])
         if best_ch_k is not None:
             kmeans_C = KMeans(n_clusters=best_ch_k, n_init='auto', random_state=self.random_state).fit(self.X)
-            ari_C = adjusted_rand_score(self.target.labels_, kmeans_C.labels_)
+            ari_C = adjusted_rand_score(self.y[self.eval_mask], kmeans_C.labels_[self.eval_mask])
         if gap_k_val is not None:
             kmeans_G = KMeans(n_clusters=gap_k_val, n_init='auto', random_state=self.random_state).fit(self.X)
-            ari_G = adjusted_rand_score(self.target.labels_, kmeans_G.labels_)
+            ari_G = adjusted_rand_score(self.y[self.eval_mask], kmeans_G.labels_[self.eval_mask])
 
         return {
             "k_silhouette": best_k,

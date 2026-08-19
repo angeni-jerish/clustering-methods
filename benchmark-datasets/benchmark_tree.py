@@ -13,10 +13,24 @@ ari_cols = ["ari_silhouette", "ari_gap", "ari_elbow", "ari_dbi", "ari_chi"]
 
 df["best_method"] = (df[ari_cols].idxmax(axis=1)).map(method_names)
 
+#checking if the fit is the same as the target when it identifies the true k
+for method, k_col, ari_col in [
+    ("silhouette", "best_k_silhouette", "ari_silhouette"),
+    ("gap", "best_k_gap", "ari_gap"),
+    ("elbow", "best_k_elbow", "ari_elbow"),
+    ("dbi", "best_k_dbi", "ari_dbi"),
+    ("chi", "best_k_chi", "ari_chi"),
+]:
+    mask = df[k_col] == 10  # true k
+    matches = df.loc[mask, ari_col] == df.loc[mask, "target_ari"]
+    print(f"{method}: {matches.sum()}/{mask.sum()} rows where best_k==10 match target_ari")
+
+
+
 print(df["best_method"].value_counts()) #ensuring every method has a sufficient number of "best runs"
 
 feature_cols = [
-    "hopkins","pca_pc1", "pca_dims_to_80",
+    "hopkins","dist_concentration", "pca_pc1", "pca_dims_to_80",
     "pca_entropy", "outlier_rate", "density_var", "dimensions",
 ]
 X = df[feature_cols]
