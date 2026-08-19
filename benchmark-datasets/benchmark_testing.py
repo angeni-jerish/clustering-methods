@@ -43,6 +43,8 @@ for scenario in scenarios:
             knob_value=knob,
             random_state=seed
         )
+        print(f"-> Calculating Target ARI...")
+        target_ari = dataset.target_ari
         print(f"  -> Calculating Meta-features...")
         # Pull outputs from your code
         meta = dataset.get_meta_features()
@@ -55,7 +57,7 @@ for scenario in scenarios:
             "dimensions": actual_d, 
             "knob": knob, 
             "seed": seed,
-            
+            "target_ari" : target_ari,
             # Upfront Landscape Meta-Features
             "hopkins": meta["hopkins"], 
             "density_var": meta["density_variation"],
@@ -89,11 +91,3 @@ correlation_matrix = df_results.corr(numeric_only=True)
 
 # Isolate just your accuracy rows (ARI) against your upfront shapes
 print(correlation_matrix[["ari_silhouette", "ari_gap", "ari_elbow", "ari_dbi", "ari_chi"]])
-
-'''
-for scenario in scenarios:
-    print(f"\n\n--- Running Benchmark for Scenario: {scenario} ---")
-    test = BenchmarkDataset(scenario=scenario, n_clusters=10, n_features=10, n_samples=1000, knob_value=choose_knob_value(scenario), random_state=42)
-    test.get_meta_features()
-    test.km_methods()
-'''

@@ -10,7 +10,8 @@ class BenchmarkDataset:
         self.knob_value = knob_value
         self.X, self.y = self.choose_scenario()
         self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state, n_init='auto').fit(self.X)
-
+        self.target_ari = adjusted_rand_score(self.y, self.target.labels_)
+    
     def choose_scenario(self):
         if self.scenario == "baseline":
             X, y = make_blobs(n_samples=self.n_samples, n_features=self.n_features, centers=self.n_clusters, 

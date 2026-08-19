@@ -13,3 +13,5 @@ import numpy as np
 import scipy as sp 
 from scipy.spatial.distance import pdist
 from sklearn.neighbors import NearestNeighbors,LocalOutlierFactor
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import export_text
