@@ -12,6 +12,9 @@ class BenchmarkDataset:
         self.eval_mask = self.y != -1
         self.target = KMeans(n_clusters=self.n_clusters, random_state=self.random_state, n_init='auto').fit(self.X)
         self.target_ari = adjusted_rand_score(self.y[self.eval_mask], self.target.labels_[self.eval_mask])
+
+        if self.target_ari<0.65:
+            self.target_ari =None
     
     def choose_scenario(self):
         if self.scenario == "baseline":
@@ -266,32 +269,47 @@ class BenchmarkDataset:
         
         # K-Means Clustering Models Evaluated Direct via n_init='auto'
         ari_E, ari_S, ari_D, ari_C, ari_G = None, None, None, None, None
-
+        win_E, win_S, win_D, win_C, win_G = False, False, False, False, False
         if auto_k_val is not None:
             kmeans_E = KMeans(n_clusters=auto_k_val, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_E = adjusted_rand_score(self.y[self.eval_mask], kmeans_E.labels_[self.eval_mask])
+            if auto_k_val ==self.n_clusters:
+                win_E=True
         if best_k is not None:
             kmeans_S = KMeans(n_clusters=best_k, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_S = adjusted_rand_score(self.y[self.eval_mask], kmeans_S.labels_[self.eval_mask])
+            if best_k==self.n_clusters:
+                win_S=True
         if best_dbi_k is not None:
             kmeans_D = KMeans(n_clusters=best_dbi_k, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_D = adjusted_rand_score(self.y[self.eval_mask], kmeans_D.labels_[self.eval_mask])
+            if best_dbi_k==self.n_clusters:
+                 win_D=True
         if best_ch_k is not None:
             kmeans_C = KMeans(n_clusters=best_ch_k, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_C = adjusted_rand_score(self.y[self.eval_mask], kmeans_C.labels_[self.eval_mask])
+            if best_ch_k==self.n_clusters:
+                win_C=True
         if gap_k_val is not None:
             kmeans_G = KMeans(n_clusters=gap_k_val, n_init='auto', random_state=self.random_state).fit(self.X)
             ari_G = adjusted_rand_score(self.y[self.eval_mask], kmeans_G.labels_[self.eval_mask])
+            if gap_k_val==self.n_clusters:
+                win_G=True
 
         return {
             "k_silhouette": best_k,
             "ari_silhouette": ari_S,
+            "win_S": win_S,
             "k_gap": gap_k_val,
             "ari_gap": ari_G,
+            "win_G": win_G,
             "k_elbow": auto_k_val,
             "ari_elbow": ari_E,
+            "win_E": win_E,
             "k_dbi": best_dbi_k,
             "ari_dbi": ari_D,
+            "win_D": win_D,
             "k_chi": best_ch_k,
-            "ari_chi": ari_C
+            "ari_chi": ari_C,
+            "win_C": win_C
         }

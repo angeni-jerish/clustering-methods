@@ -2,7 +2,7 @@ from benchmark_class import BenchmarkDataset
 from imports import *
 
 scenarios = ["baseline", "high_dim", "high_overlap", "with_noise", "density_variation", "size_imbalance"]
-seeds = [42, 100, 2026, 999, 7, 555, 31415, 8675309, 271828, 123456]
+seeds = [42, 100, 2026, 999, 7, 555, 31415, 8675309, 271828, 123456, 314, 2718, 1618, 90210, 12321, 55555, 777777, 4242, 8080, 999983]
 dimensions = [2, 4, 8, 16, 32] 
 overlap_levels = [1.0, 2.0, 3.0, 4.0, 5.0] 
 noise_levels = [0.02, 0.08, 0.15, 0.25, 0.40] 
@@ -81,7 +81,14 @@ for scenario in scenarios:
             "ari_gap": results["ari_gap"],
             "ari_elbow": results["ari_elbow"],
             "ari_dbi": results["ari_dbi"],
-            "ari_chi": results["ari_chi"]
+            "ari_chi": results["ari_chi"],
+
+            #Retrieved true k?
+            "win_S": results["win_S"],
+            "win_G": results["win_G"],
+            "win_E": results["win_E"],
+            "win_D": results["win_D"],
+            "win_C": results["win_C"]
         })
 
 # Flatten arrays straight to an analytical table spreadsheet
